@@ -1,1 +1,106 @@
 # aws
+
+Create a new EC2 instance as before
+Open its public IP in the browser and verify you can see Apache page 
+Actions → Image and templates → Create image
+Image name: PRN-AMI
+Image description: Apache webserver with custom PRN page
+Create Image
+EC2 -> AMIs
+Wait till the AMI status changes to Available
+Launch a new instance using this AMI
+Select the above AMI
+Click Launch instance from this AMI 
+All options as before, but in subnet, select a subnet from a different availability zone
+Now two EC2 instances should be running in two Azs
+Try accessing their public IPs 
+----------------------------------------------------------------------------------------------------
+ Go to the created S3 bucket
+Navigate to Permissions → Bucket Policy
+Copy-paste from: https://github.com/newdelthis/demo/blob/main/bucket_policy.json
+Change the bucket name in the policy to your bucket name
+Click Save changes
+Go to Properties tab → Static website hosting
+Click Edit → Enable
+Enter: Index document: index.html Error document: error.html
+Click Save changes
+Go to Properties → Static website hosting
+Copy the Website endpoint URL (e.g., http://my-static-website-bucket.s3-website-us-east-1.amazonaws.com)
+Open the URL in a browser — your site should be live
+-----------------------------------------------------------------------------------
+lambda 
+
+def lambda_handler(event, context):
+    message = 'Hello from 123456'
+    print(message)
+
+    return {
+        'statusCode': 200,
+        'body': message
+    }
+____________________________________________________________________________________________
+COPY AND PASTE LAMBDA
+
+Search for S3  … Click Create bucket
+Everything leave as default … Bucket name: yourprn-source-bucket
+Repeat … Bucket name: yourprn-destination-bucket
+Note: bucket name must be globally unique
+Search for lambda -> Create function -> Author from scratch -> Function name: my-lambda-s3-function -> Runtime: Python 3.12 -> Permissions -> Change default execution role -> Execution role -> Create a new role with basic Lambda permissions -> Create function
+Code -> Replace the existing code with the code from https://github.com/newdelthis/demo/blob/main/lambda_s3_copy.py 
+Replace source and target bucket names with your bucket names
+Deploy
+
+import boto3
+import urllib.parse
+
+s3 = boto3.client('s3')
+target_bucket_name = '023-dest'  # destination bucket
+
+
+def lambda_handler(event, context):
+    records = event.get('Records', [])
+    if not records:
+        print("No S3 records in this event. Upload a file or use the S3 Put test template.")
+        return {'statusCode': 400, 'body': 'Not an S3 event'}
+
+    for record in records:
+        source_bucket_name = record['s3']['bucket']['name']
+        key = urllib.parse.unquote_plus(record['s3']['object']['key'], encoding='utf-8')
+
+        try:
+            copy_source = {'Bucket': source_bucket_name, 'Key': key}
+            s3.copy(copy_source, target_bucket_name, key)
+            print(f"Successfully copied {key} from {source_bucket_name} to {target_bucket_name}")
+        except Exception as e:
+            print(f"Error copying {key}: {e}")
+            raise e
+
+    return {'statusCode': 200, 'body': 'Copy complete'}
+
+
+Still in Lambda … Configuration -> Permissions -> Click on the role name (e.g. myLambdaFunction-role-6qhvpscu) -> Add permissions button -> Attach policies -> AWSLambdaBasicExecutionRole -> Add permissions
+Again Add permissions button -> Create inline policy -> JSON
+Paste the policy from https://github.com/newdelthis/demo/blob/main/lambda_s3_copy_policy.json, remember to change source and destination bucket names -> Next -> Give a policy name (e.g. Lambda-S3-Permission-Policy) -> Create policy
+Search for S3 -> Open source bucket -> Properties -> Event notifications -> Create event notification -> Event notification name: lambda-trigger -> Events: Select All object create events -> Destination: Choose Lambda function -> Under Lambda function, select your lambda function name -> Save changes
+Upload 2-3 small files from your local machine into the source bucket -> Check whether they are automatically copied into the destination bucket
+Debugging/general understanding -> Go to your Lambda function -> Monitor
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject"
+            ],
+            "Resource": "arn:aws:s3:::YOUR_SOURCE_BUCKET_NAME/*"
+        },
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject"
+            ],
+            "Resource": "arn:aws:s3:::YOUR_TARGET_BUCKET_NAME/*"
+        }
+    ]
+}
