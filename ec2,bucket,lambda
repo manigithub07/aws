@@ -27,6 +27,26 @@ Click Save changes
 Go to Properties → Static website hosting
 Copy the Website endpoint URL (e.g., http://my-static-website-bucket.s3-website-us-east-1.amazonaws.com)
 Open the URL in a browser — your site should be live
+
+___________________________________________________________________________________________________________________________________
+cloud watch for uploaded file in s3
+def lambda_handler(event, context):
+
+    print("Lambda function invoked!")
+
+    for record in event['Records']:
+        bucket = record['s3']['bucket']['name']
+        filename = record['s3']['object']['key']
+
+        print("Bucket:", bucket)
+        print("Uploaded file:", filename)
+
+    return {
+        'statusCode': 200,
+        'body': 'Hello from 123456'
+    }
+
+
 -----------------------------------------------------------------------------------
 lambda 
 
@@ -104,3 +124,15 @@ Debugging/general understanding -> Go to your Lambda function -> Monitor
         }
     ]
 }
+___________________________________________________________________________________________________________________________
+VPCC
+
+If you have successfully connected to the private IP of the private instance, run the steps below
+Install Apache: sudo yum install httpd -y
+Only if you get errors: echo   "nameserver 8.8.8.8" | sudo tee   -a     /etc/resolv.conf
+Start Apache service: sudo service httpd start
+Enable Apache: sudo chkconfig httpd on
+Test locally: curl   localhost
+Start Putty and connect to public IP of public instance
+From the public instance, curl <private IP of private instance>
+
